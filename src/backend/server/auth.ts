@@ -384,15 +384,18 @@ export async function getOrInitUsers(envCtx: any) {
     //                        silently reset by upgrading.
     const adminPass = adminUser ? String(adminUser.password || "").trim() : ""
     const isValidFormat = /^[0-9a-f]{64}$/i.test(adminPass)
-    if (adminUser && !isValidFormat) {
-      const envPass =
-        (envCtx && envCtx.ADMIN_PASS) ||
-        (typeof process !== "undefined" ? process.env?.ADMIN_PASS : "") ||
-        ""
-      if (envPass) {
-        await setUserPassword(adminUser, envPass)
-        await saveDb(db, envCtx)
-      } else if (!adminPass) {
+    const envPass =
+      (envCtx && envCtx.ADMIN_PASS) ||
+      (typeof process !== "undefined" ? process.env?.ADMIN_PASS : "") ||
+      ""
+    if (adminUser && envPass && !(await verifyUserPassword(adminUser, envPass))) {
+      // An explicit operator reset must also replace an existing valid hash.
+      // Skip the write once it matches to avoid rotating salts and sessions
+      // on every request.
+      await setUserPassword(adminUser, envPass)
+      await saveDb(db, envCtx)
+    } else if (adminUser && !isValidFormat && !envPass) {
+      if (!adminPass) {
         // 未初始化：不再自动生成随机密码，交由 Web 安装向导（POST /api/public/init/setup）完成。
         // 前端会在 /api/public/init_status 返回未初始化时自动跳转到安装向导。
         console.warn(
