@@ -141,6 +141,26 @@ test("Security(F-11): ADMIN_PASS still forces an explicit reset (to salted doubl
   )
 })
 
+test("ADMIN_PASS resets an existing valid password without rotating it on every request", async () => {
+  await seed([adminUser("")])
+  const original = { ...env, ADMIN_PASS: "old-admin-password" }
+  await getOrInitUsers(original)
+  const before = await currentAdmin(original)
+  assert.equal(await verifyUserPassword(before, "old-admin-password"), true)
+
+  const replacement = { ...env, ADMIN_PASS: "new-admin-password" }
+  await getOrInitUsers(replacement)
+  const after = await currentAdmin(replacement)
+  assert.equal(await verifyUserPassword(after, "new-admin-password"), true)
+  assert.equal(await verifyUserPassword(after, "old-admin-password"), false)
+  const stamp = after.pwd_update_at
+  const salt = after.salt
+  await getOrInitUsers(replacement)
+  const stable = await currentAdmin(replacement)
+  assert.equal(stable.salt, salt)
+  assert.equal(stable.pwd_update_at, stamp)
+})
+
 test("user/create follows Go: no silent default password and no echoed password", async () => {
   await seed(
     [
