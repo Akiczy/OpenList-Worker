@@ -322,8 +322,11 @@ fsRouter.post("/dirs", async (c) => {
 })
 
 fsRouter.post("/list", async (c) => {
+  console.info("[fs.list] reading request");
   const body = await c.req.json().catch(() => ({}))
+  console.info("[fs.list] resolving identity");
   const user = await getUserFromContext(c)
+  console.info("[fs.list] identity resolved")
   const isShare = (body.path || "/").startsWith("/@s")
   if (!isShare && (!user || user.disabled)) {
     return c.json({ code: 401, message: "Unauthorized", data: null }, 401)
@@ -459,6 +462,7 @@ fsRouter.post("/list", async (c) => {
     }
 
     // 普通路径：应用 meta 权限（密码 + read_users + readme/header + hide 过滤）
+    console.info("[fs.list] resolving metadata");
     const meta = await getNearestMeta(reqPath, c.env)
     if (!canAccess(user, meta, reqPath, body.password || "")) {
       return c.json(
@@ -476,6 +480,7 @@ fsRouter.post("/list", async (c) => {
       )
     }
 
+    console.info("[fs.list] listing storage");
     const { content, provider, storage } = await listItems(
       reqPath,
       requestContext,
@@ -489,6 +494,7 @@ fsRouter.post("/list", async (c) => {
     // 必须与 raw.ts 的 needDownloadSign 保持对称，否则直链会验签失败。
     // 注意：不能回退 item.sign —— sign 由本层统一签发，驱动不参与
     //（历史上 webdav/autoindex 驱动曾把远程路径/URL 塞进该字段）。
+    console.info("[fs.list] storage listed");
     const signPolicy = await getSignPolicy(c)
     const encrypt = await isEncryptPath(c, reqPath)
     const signNeeded = signPolicy.enabled || encrypt
